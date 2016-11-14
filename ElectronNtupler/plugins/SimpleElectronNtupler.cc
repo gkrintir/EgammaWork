@@ -104,8 +104,19 @@ class SimpleElectronNtupler : public edm::EDAnalyzer {
       edm::EDGetTokenT<reco::VertexCollection> vtxMiniAODToken_;
       edm::EDGetTokenT<edm::View<reco::GenParticle> > genParticlesMiniAODToken_;
       edm::EDGetTokenT<reco::ConversionCollection> conversionsMiniAODToken_;
-
+  
+      // ID decisions objects
+      edm::EDGetTokenT<edm::ValueMap<bool> > eleVetoIdMapToken_;
+      edm::EDGetTokenT<edm::ValueMap<bool> > eleLooseIdMapToken_;
+      edm::EDGetTokenT<edm::ValueMap<bool> > eleMediumIdMapToken_;
+      edm::EDGetTokenT<edm::ValueMap<bool> > eleTightIdMapToken_;
+      
   TTree *electronTree_;
+
+  // Vars Event 
+  Int_t run_;
+  Int_t event_;
+  Int_t lumi_;
 
   // Vars for PVs
   Int_t pvNTracks_;
@@ -140,6 +151,11 @@ class SimpleElectronNtupler : public edm::EDAnalyzer {
   std::vector<Float_t> dz_;
   std::vector<Int_t>   expectedMissingInnerHits_;
   std::vector<Int_t>   passConversionVeto_;     
+  std::vector<Int_t> passVetoId_;
+  std::vector<Int_t> passLooseId_;
+  std::vector<Int_t> passMediumId_;
+  std::vector<Int_t> passTightId_;
+  
   std::vector<Int_t>   isTrue_;
 
   EffectiveAreas   effectiveAreas_;
@@ -157,6 +173,10 @@ class SimpleElectronNtupler : public edm::EDAnalyzer {
 // constructors and destructor
 //
 SimpleElectronNtupler::SimpleElectronNtupler(const edm::ParameterSet& iConfig):
+   eleVetoIdMapToken_(consumes<edm::ValueMap<bool> >(iConfig.getParameter<edm::InputTag>("eleVetoIdMap"))),
+   eleLooseIdMapToken_(consumes<edm::ValueMap<bool> >(iConfig.getParameter<edm::InputTag>("eleLooseIdMap"))),
+   eleMediumIdMapToken_(consumes<edm::ValueMap<bool> >(iConfig.getParameter<edm::InputTag>("eleMediumIdMap"))),
+   eleTightIdMapToken_(consumes<edm::ValueMap<bool> >(iConfig.getParameter<edm::InputTag>("eleTightIdMap"))),
   effectiveAreas_( (iConfig.getParameter<edm::FileInPath>("effAreasConfigFile")).fullPath() )
 {
 
@@ -250,6 +270,10 @@ SimpleElectronNtupler::SimpleElectronNtupler(const edm::ParameterSet& iConfig):
   electronTree_->Branch("dz"     , &dz_);
   electronTree_->Branch("expectedMissingInnerHits", &expectedMissingInnerHits_);
   electronTree_->Branch("passConversionVeto", &passConversionVeto_);
+  electronTree_->Branch("passVetoId"  ,  &passVetoId_ );
+  electronTree_->Branch("passLooseId"  ,  &passLooseId_ );
+  electronTree_->Branch("passMediumId"  ,  &passMediumId_ );
+  electronTree_->Branch("passTightId"  ,  &passTightId_ );
   electronTree_->Branch("isTrue"    , &isTrue_);
  
 }
@@ -367,6 +391,20 @@ SimpleElectronNtupler::analyze(const edm::Event& iEvent, const edm::EventSetup& 
   else
     iEvent.getByToken(conversionsMiniAODToken_, conversions);
 
+  
+  // Get the electron ID data from the event stream.
+  // Note: this implies that the VID ID modules have been run upstream.
+  // If you need more info, check with the EGM group.
+  edm::Handle<edm::ValueMap<bool> > veto_id_decisions; 
+  edm::Handle<edm::ValueMap<bool> > loose_id_decisions;
+  edm::Handle<edm::ValueMap<bool> > medium_id_decisions;
+  edm::Handle<edm::ValueMap<bool> > tight_id_decisions; 
+
+  iEvent.getByToken(eleVetoIdMapToken_ ,veto_id_decisions);
+  iEvent.getByToken(eleLooseIdMapToken_ ,loose_id_decisions);
+  iEvent.getByToken(eleMediumIdMapToken_ ,medium_id_decisions);
+  iEvent.getByToken(eleTightIdMapToken_ ,tight_id_decisions);
+
   // Loop over electrons
   nElectrons_ = 0;
   pt_.clear();
@@ -386,7 +424,11 @@ SimpleElectronNtupler::analyze(const edm::Event& iEvent, const edm::EventSetup& 
   d0_.clear();
   dz_.clear();
   expectedMissingInnerHits_.clear();
-  passConversionVeto_.clear();     
+  passConversionVeto_.clear();
+  passVetoId_.clear();
+  passLooseId_.clear();
+  passMediumId_.clear();
+  passTightId_.clear();
   isTrue_.clear();
 
   for (size_t i = 0; i < electrons->size(); ++i){
@@ -461,6 +503,22 @@ SimpleElectronNtupler::analyze(const edm::Event& iEvent, const edm::EventSetup& 
 							       theBeamSpot->position());
     passConversionVeto_.push_back( (int) passConvVeto );
     
+
+    //
+    // Look up and save the ID decisions
+    // 
+    bool isPassVetoEleId  = (*veto_id_decisions)[el];
+    passVetoId_.push_back  ( (int)isPassVetoEleId  );
+    
+    bool isPassLooseEleId  = (*loose_id_decisions)[el];
+    passLooseId_.push_back  ( (int)isPassLooseEleId  );
+    
+    bool isPassMediumEleId  = (*medium_id_decisions)[el];
+    passMediumId_.push_back  ( (int)isPassMediumEleId  );
+    
+    bool isPassTightEleId  = (*tight_id_decisions)[el];
+    passTightId_.push_back  ( (int)isPassTightEleId  );
+
     // Match to generator level truth
     
     isTrue_.push_back( matchToTruth( el, genParticles) );

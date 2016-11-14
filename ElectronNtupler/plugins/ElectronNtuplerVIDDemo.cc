@@ -48,6 +48,7 @@
 #include "DataFormats/EgammaCandidates/interface/ConversionFwd.h"
 #include "DataFormats/EgammaCandidates/interface/Conversion.h"
 #include "RecoEgamma/EgammaTools/interface/ConversionTools.h"
+#include "RecoEgamma/EgammaTools/interface/EffectiveAreas.h"
 
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
@@ -119,6 +120,9 @@ private:
   TTree *electronTree_;
 
   // all variables for the output tree
+  Int_t run;
+  Int_t event;
+
   Int_t nElectrons_;
 
   std::vector<Float_t> pt_;
@@ -128,8 +132,12 @@ private:
   std::vector<Float_t> dz_;
   std::vector<Int_t> passConversionVeto_;
 
+  // Effective area constants
+  //EffectiveAreas _effectiveAreas;
+
   std::vector<Int_t> passEleId_;
 
+  
   std::vector<Int_t> isTrue_;
 
   // Vars for weight (can be negative)
@@ -153,6 +161,7 @@ ElectronNtuplerVIDDemo::ElectronNtuplerVIDDemo(const edm::ParameterSet& iConfig)
   eleIdFullInfoMapToken_(consumes<edm::ValueMap<vid::CutFlowResult> >
 			       (iConfig.getParameter<edm::InputTag>("eleIdFullInfoMap"))),
   verboseIdFlag_(iConfig.getParameter<bool>("eleIdVerbose"))
+  //_effectiveAreas( (iConfig.getParameter<edm::FileInPath>("effAreasConfigFile")).fullPath())
 {
 
   //
@@ -359,6 +368,19 @@ ElectronNtuplerVIDDemo::analyze(const edm::Event& iEvent, const edm::EventSetup&
 							       conversions,
 							       theBeamSpot->position());
     passConversionVeto_.push_back( (int) passConvVeto );
+
+    /*
+    const reco::GsfElectron::PflowIsolationVariables& pfIso =el->pfIsolationVariables();
+    const float chad = pfIso.sumChargedHadronPt;
+    const float nhad = pfIso.sumNeutralHadronEt;
+    const float pho = pfIso.sumPhotonEt;
+    const float  eA = _effectiveAreas.getEffectiveArea( absEta );
+    const float rho = _rhoHandle.isValid() ? (float)(*_rhoHandle) : 0; // std::max likes float arguments
+    const float iso = chad + std::max(0.0f, nhad + pho - rho*eA);
+    */
+  // Apply the cut and return the result
+  // Scale by pT if the relative isolation is requested but avoid division by 0
+    //return iso < isoCut*(_isRelativeIso ? cand->pt() : 1.);
 
     //
     // Look up and save the ID decisions
